@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # We need to make sure 'pharmacy' is treated as a package
 from pharmacy.router import router as pharmacy_v1_router
 from pharmacy.inventory_router import router as inventory_router
+from pharmacy.reports_router import router as reports_router
 from pharmacy_v2 import router as pharmacy_v2_router
 
 app = FastAPI(title="Pharma Backend", version="1.0.0")
@@ -33,6 +34,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(pharmacy_v1_router)
 app.include_router(inventory_router)
+app.include_router(reports_router)
 app.include_router(pharmacy_v2_router)
 
 @app.get("/")
@@ -40,4 +42,5 @@ async def root():
     return {"message": "Pharma Backend is running!"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

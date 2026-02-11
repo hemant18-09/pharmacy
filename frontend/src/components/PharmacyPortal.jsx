@@ -100,6 +100,17 @@ const fetchTopMedicines = async () => {
     }
 };
 
+const fetchAnalyticsStats = async () => {
+    try {
+        const res = await fetch(`${API_BASE}/pharmacy/reports/stats`);
+        if (!res.ok) throw new Error('Failed to fetch analytics stats');
+        return await res.json();
+    } catch (e) {
+        console.error(e);
+        return { total_revenue: 0, total_orders: 0, avg_delivery_time_mins: 0, status_distribution: [] };
+    }
+};
+
 const addInventoryItem = async (item) => {
     const res = await fetch(`${API_BASE}/pharmacy/inventory/add`, {
         method: 'POST',
@@ -835,7 +846,7 @@ const InventoryScreen = ({ searchQuery }) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [inventory, setInventory] = useState([]);
-    
+
     // State for new item form
     const [newItem, setNewItem] = useState({
         drug_name: '',
@@ -929,7 +940,7 @@ const InventoryScreen = ({ searchQuery }) => {
                         <span className="hidden sm:inline">{filterLowStock ? 'Showing Low Stock' : 'Filter Low Stock'}</span>
                         <span className="sm:hidden">Filter</span>
                     </button>
-                    <button 
+                    <button
                         onClick={() => setShowAddModal(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 shadow-sm transition-colors"
                     >
@@ -957,7 +968,7 @@ const InventoryScreen = ({ searchQuery }) => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                             <div>
                                 <p className="text-gray-500 text-xs uppercase">Stock</p>
@@ -975,10 +986,14 @@ const InventoryScreen = ({ searchQuery }) => {
                                     {item.expiry_date ? item.expiry_date.substring(0, 10) : 'N/A'}
                                 </span>
                             </div>
+                            <div>
+                                <p className="text-gray-500 text-xs uppercase">Price / Unit</p>
+                                <span className="font-semibold text-gray-700">₹{item.price?.toFixed(2) || '0.00'}</span>
+                            </div>
                         </div>
                     </div>
                 ))}
-                
+
                 {filteredInventory.length === 0 && (
                     <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                         No items found matching your filter.
@@ -1020,7 +1035,7 @@ const InventoryScreen = ({ searchQuery }) => {
                                             <span className="text-gray-700 font-medium">{item.quantity}</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-gray-700">₹--</td>
+                                    <td className="px-6 py-4 text-gray-700 font-medium">₹{item.price?.toFixed(2) || '0.00'}</td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2">
                                             <button onClick={() => handleEditClick(item)} className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-md transition-colors">
@@ -1109,7 +1124,7 @@ const InventoryScreen = ({ searchQuery }) => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                                 />
                             </div>
-                            
+
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">
                                     Cancel
@@ -1172,10 +1187,15 @@ const InventoryScreen = ({ searchQuery }) => {
 const ReportsScreen = () => {
     const [ordersTrendData, setOrdersTrendData] = useState([]);
     const [topSellingData, setTopSellingData] = useState([]);
+    const [analyticsStats, setAnalyticsStats] = useState({
+        total_revenue: 0,
+        total_orders: 0,
+        avg_delivery_time_mins: 0,
+        status_distribution: []
+    });
 
     useEffect(() => {
         fetchDailySummary().then(data => {
-            // Map API response to chart format
             const mapped = data.map(d => ({
                 day: d.label,
                 orders: d.total_orders
@@ -1190,14 +1210,17 @@ const ReportsScreen = () => {
             }));
             setTopSellingData(mapped);
         }).catch(console.error);
+
+        fetchAnalyticsStats().then(setAnalyticsStats).catch(console.error);
     }, []);
 
-    const statusDistributionData = [
-        { name: 'Pending', value: 12, color: '#F59E0B' },
-        { name: 'Ready', value: 45, color: '#0F766E' },
-        { name: 'Delivered', value: 30, color: '#10B981' },
-        { name: 'Cancelled', value: 5, color: '#EF4444' },
-    ];
+    const statusDistributionData = analyticsStats.status_distribution.length > 0
+        ? analyticsStats.status_distribution
+        : [
+            { name: 'Pending', value: 0, color: '#F59E0B' },
+            { name: 'Ready', value: 0, color: '#0F766E' },
+            { name: 'Delivered', value: 0, color: '#10B981' },
+        ];
 
     return (
         <div className="space-y-6">
@@ -1224,7 +1247,7 @@ const ReportsScreen = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
-                        <h3 className="text-2xl font-bold text-gray-800">₹--</h3>
+                        <h3 className="text-2xl font-bold text-gray-800">₹{analyticsStats.total_revenue.toLocaleString('en-IN')}</h3>
                     </div>
                     <div className="p-3 bg-teal-50 text-teal-600 rounded-lg">
                         <TrendingUp size={24} />
@@ -1233,7 +1256,7 @@ const ReportsScreen = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 text-sm font-medium">Total Orders</p>
-                        <h3 className="text-2xl font-bold text-gray-800">--</h3>
+                        <h3 className="text-2xl font-bold text-gray-800">{analyticsStats.total_orders}</h3>
                     </div>
                     <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
                         <ShoppingBag size={24} />
@@ -1242,7 +1265,7 @@ const ReportsScreen = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 text-sm font-medium">Avg. Delivery Time</p>
-                        <h3 className="text-2xl font-bold text-gray-800">-- mins</h3>
+                        <h3 className="text-2xl font-bold text-gray-800">{analyticsStats.avg_delivery_time_mins} mins</h3>
                     </div>
                     <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
                         <Clock size={24} />
@@ -1509,15 +1532,14 @@ const SettingsScreen = () => {
                             <button className="px-6 py-2.5 text-gray-600 font-medium hover:text-gray-800 transition-colors">
                                 Cancel
                             </button>
-                            <button 
+                            <button
                                 onClick={handleSave}
                                 disabled={saveStatus === 'saving'}
-                                className={`px-6 py-2.5 font-medium rounded-lg shadow-sm flex items-center gap-2 transition-all ${
-                                    saveStatus === 'saving' ? 'bg-teal-600 opacity-75' : 'bg-teal-700 hover:bg-teal-800'
-                                } text-white`}>
+                                className={`px-6 py-2.5 font-medium rounded-lg shadow-sm flex items-center gap-2 transition-all ${saveStatus === 'saving' ? 'bg-teal-600 opacity-75' : 'bg-teal-700 hover:bg-teal-800'
+                                    } text-white`}>
                                 {saveStatus === 'saving' ? (
                                     <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                         Saving...
                                     </>
                                 ) : (

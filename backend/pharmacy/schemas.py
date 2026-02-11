@@ -13,7 +13,7 @@ from .models import (
     PrescriptionStatus,
 )
 
-
+from typing import List, Optional
 # ── Requests ──────────────────────────────────
 
 class CreateOrderRequest(BaseModel):
@@ -113,6 +113,7 @@ class OrderDetailResponse(BaseModel):
     status: PrescriptionStatus
     color_code: Optional[str] = None
     delivery_mode: DeliveryMode
+    total_amount: float = 0.0
     created_at: Optional[str] = None
     accepted_at: Optional[str] = None
     ready_at: Optional[str] = None
@@ -148,6 +149,7 @@ class InventoryItemResponse(BaseModel):
     is_expiring_soon: bool = Field(
         False, description="True when expiry < 30 days → Yellow warning"
     )
+    price: float = Field(default=0.0, description="Price per unit in ₹")
 
 
 class UpdateStockRequest(BaseModel):
@@ -164,6 +166,7 @@ class AddInventoryRequest(BaseModel):
     quantity: int
     strength: str = ""
     threshold: int = 10
+    price: float = 0.0
 
 
 # ══════════════════════════════════════════════
@@ -184,6 +187,21 @@ class TopMedicineItem(BaseModel):
     drug_name: str
     count: int
     rank: int
+
+
+class StatusDistributionItem(BaseModel):
+    """One slice in the status distribution donut chart."""
+    name: str
+    value: int
+    color: str
+
+
+class AnalyticsStatsResponse(BaseModel):
+    """Key metrics for the Reports / Analytics page."""
+    total_revenue: float = Field(0.0, description="Sum of delivered order values in ₹")
+    total_orders: int = Field(0, description="Count of all non-rejected orders")
+    avg_delivery_time_mins: int = Field(0, description="Average minutes from created to completed")
+    status_distribution: List[StatusDistributionItem] = []
 
 
 # ══════════════════════════════════════════════

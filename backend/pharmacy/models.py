@@ -94,6 +94,7 @@ class PharmacyOrder(BaseModel):
     medications: List[MedicationItem]
     status: PrescriptionStatus = PrescriptionStatus.NEW
     delivery_mode: DeliveryMode = DeliveryMode.STORE_PICKUP
+    total_amount: float = Field(default=0.0, description="Total order value in ₹")
     timestamps: OrderTimestamps = Field(default_factory=OrderTimestamps)
 
     model_config = ConfigDict(use_enum_values=True)
@@ -144,6 +145,7 @@ class InventoryItem(BaseModel):
     expiry_date: datetime = Field(..., description="Batch expiry date")
     batch_number: str = Field(..., description="Manufacturer batch ID")
     threshold: int = Field(default=10, description="Low-stock warning threshold")
+    price: float = Field(default=0.0, description="Price per unit in ₹")
 
     model_config = ConfigDict(use_enum_values=True)
 

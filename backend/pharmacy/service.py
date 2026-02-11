@@ -162,13 +162,64 @@ async def get_dashboard_stats() -> dict:
 
 def _mock_dashboard_stats() -> dict:
     """Deterministic mock data so the frontend always has something to render."""
+    today = _start_of_today()
+    
+    # Import mock inventory from inventory service to check low stock
+    try:
+        from pharmacy.inventory_service import _MOCK_INVENTORY_DB
+        low_stock_count = sum(1 for item in _MOCK_INVENTORY_DB if item.get("is_low_stock", False))
+    except ImportError:
+        low_stock_count = 2 # Fallback
+        
+    new_prescriptions_today = 0
+    orders_in_progress = 0
+    orders_delivered_today = 0
+    
+    for order in _MOCK_ORDERS_DB:
+        status = order.get("status")
+        created_at_str = order.get("timestamps", {}).get("created_at")
+        completed_at_str = order.get("timestamps", {}).get("completed_at")
+        
+        # Parse dates (naive/simple check)
+        created_at = None
+        if created_at_str:
+             try:
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                if created_at.tzinfo: created_at = created_at.replace(tzinfo=None) # Compare naive
+             except: pass
+             
+        completed_at = None
+        if completed_at_str:
+            try:
+                completed_at = datetime.fromisoformat(completed_at_str.replace("Z", "+00:00"))
+                if completed_at.tzinfo: completed_at = completed_at.replace(tzinfo=None)
+            except: pass
+
+        # New Today
+        if status == PrescriptionStatus.NEW:
+            if created_at and created_at >= today:
+                new_prescriptions_today += 1
+                
+        # In Progress
+        if status in [PrescriptionStatus.ACCEPTED, PrescriptionStatus.PREPARING]:
+            orders_in_progress += 1
+            
+        # Delivered Today
+        if status in [PrescriptionStatus.DELIVERED, PrescriptionStatus.PICKED_UP]:
+            if completed_at and completed_at >= today:
+                orders_delivered_today += 1
+
     return {
-        "new_prescriptions_today": 4,
-        "orders_in_progress": 7,
-        "orders_delivered_today": 12,
-        "low_stock_alerts": 2,
+        "new_prescriptions_today": new_prescriptions_today,
+        "orders_in_progress": orders_in_progress,
+        "orders_delivered_today": orders_delivered_today,
+        "low_stock_alerts": low_stock_count,
     }
 
+
+# ──────────────────────────────────────────────
+# 2.  Order Listing  (with status / date filter)
+# ──────────────────────────────────────────────
 
 # ──────────────────────────────────────────────
 # 2.  Order Listing  (with status / date filter)
@@ -223,28 +274,36 @@ async def list_orders(
 # Mock In-Memory DB (Global State)
 # ──────────────────────────────────────────────
 
-_MOCK_ORDERS_DB = [
-    { "id": "RX-1001", "patient_name": "Aarav Sharma", "status": PrescriptionStatus.NEW, "color_code": "teal", "medication_count": 3, "created_at": _ts_to_iso(_now() - timedelta(hours=1)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1002", "patient_name": "Priya Patel", "status": PrescriptionStatus.ACCEPTED, "color_code": "blue", "medication_count": 2, "created_at": _ts_to_iso(_now() - timedelta(hours=3)), "accepted_at": _ts_to_iso(_now() - timedelta(hours=2, minutes=30)), "ready_at": None, "completed_at": None },
-    { "id": "RX-1003", "patient_name": "Rohan Gupta", "status": PrescriptionStatus.PREPARING, "color_code": "amber", "medication_count": 5, "created_at": _ts_to_iso(_now() - timedelta(hours=5)), "accepted_at": _ts_to_iso(_now() - timedelta(hours=4, minutes=30)), "ready_at": None, "completed_at": None },
-    { "id": "RX-1004", "patient_name": "Sneha Reddy", "status": PrescriptionStatus.READY, "color_code": "green", "medication_count": 1, "created_at": _ts_to_iso(_now() - timedelta(hours=8)), "accepted_at": _ts_to_iso(_now() - timedelta(hours=7, minutes=30)), "ready_at": _ts_to_iso(_now() - timedelta(hours=6)), "completed_at": None },
-    { "id": "RX-1005", "patient_name": "Vikram Singh", "status": PrescriptionStatus.DELIVERED, "color_code": "green", "medication_count": 4, "created_at": _ts_to_iso(_now() - timedelta(hours=12)), "accepted_at": _ts_to_iso(_now() - timedelta(hours=11, minutes=30)), "ready_at": _ts_to_iso(_now() - timedelta(hours=10)), "completed_at": _ts_to_iso(_now() - timedelta(hours=9)) },
-    { "id": "RX-1006", "patient_name": "Anita Desai", "status": PrescriptionStatus.NEW, "color_code": "teal", "medication_count": 2, "created_at": _ts_to_iso(_now() - timedelta(minutes=30)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1011", "patient_name": "Karan Mehta", "status": PrescriptionStatus.NEW, "color_code": "teal", "medication_count": 1, "created_at": _ts_to_iso(_now() - timedelta(minutes=20)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1012", "patient_name": "Nisha Kapoor", "status": PrescriptionStatus.NEW, "color_code": "teal", "medication_count": 4, "created_at": _ts_to_iso(_now() - timedelta(minutes=15)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1013", "patient_name": "Dev Malhotra", "status": PrescriptionStatus.NEW, "color_code": "teal", "medication_count": 2, "created_at": _ts_to_iso(_now() - timedelta(minutes=10)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1014", "patient_name": "Riya Shah", "status": PrescriptionStatus.NEW, "color_code": "teal", "medication_count": 3, "created_at": _ts_to_iso(_now() - timedelta(minutes=5)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1007", "patient_name": "Rahul Verma", "status": PrescriptionStatus.REJECTED, "color_code": "red", "medication_count": 1, "created_at": _ts_to_iso(_now() - timedelta(days=1)), "accepted_at": None, "ready_at": None, "completed_at": None },
-    { "id": "RX-1008", "patient_name": "Kavita Kapoor", "status": PrescriptionStatus.PICKED_UP, "color_code": "gray", "medication_count": 3, "created_at": _ts_to_iso(_now() - timedelta(days=2)), "accepted_at": _ts_to_iso(_now() - timedelta(days=2, hours=1)), "ready_at": _ts_to_iso(_now() - timedelta(days=2, hours=2)), "completed_at": _ts_to_iso(_now() - timedelta(days=2, hours=3)) },
-    { "id": "RX-1009", "patient_name": "Amit Shah", "status": PrescriptionStatus.ACCEPTED, "color_code": "blue", "medication_count": 6, "created_at": _ts_to_iso(_now() - timedelta(hours=2)), "accepted_at": _ts_to_iso(_now() - timedelta(hours=1, minutes=30)), "ready_at": None, "completed_at": None },
-    { "id": "RX-1010", "patient_name": "Neha Joshi", "status": PrescriptionStatus.PREPARING, "color_code": "amber", "medication_count": 2, "created_at": _ts_to_iso(_now() - timedelta(hours=4)), "accepted_at": _ts_to_iso(_now() - timedelta(hours=3, minutes=30)), "ready_at": None, "completed_at": None },
-]
+from pharmacy.mock_data import get_initial_mock_orders
+
+# Initialize mock DB with fresh data on module load
+_MOCK_ORDERS_DB = get_initial_mock_orders()
 
 def _mock_order_list(status_filter: Optional[str] = None) -> List[dict]:
     """Seed data for local development."""
-    if status_filter:
-        return [o for o in _MOCK_ORDERS_DB if o["status"] == status_filter]
-    return _MOCK_ORDERS_DB
+    # Add color codes dynamically if not present
+    results = []
+    for o in _MOCK_ORDERS_DB:
+        # Shallow copy to avoid mutating global state unnecessarily in read operations
+        order = o.copy()
+        order["color_code"] = STATUS_COLOR_MAP.get(order["status"], "gray") 
+        # Calculate medication count if not present
+        if "medication_count" not in order:
+            order["medication_count"] = len(order.get("medications", []))
+        
+        # Flatten patient name for list view
+        if "patient_name" not in order:
+             order["patient_name"] = order.get("patient_info", {}).get("name", "Unknown")
+
+        if status_filter:
+            if order["status"] == status_filter:
+                results.append(order)
+        else:
+            results.append(order)
+            
+    # Sort by created_at desc
+    results.sort(key=lambda x: x["timestamps"]["created_at"] or "", reverse=True)
+    return results
 
 
 # ──────────────────────────────────────────────
@@ -285,28 +344,33 @@ async def get_order_detail(order_id: str) -> Optional[dict]:
     }
 
 
-def _mock_order_detail(order_id: str) -> dict:
-    return {
-        "id": order_id,
-        "patient_name": "Aarav Sharma",
-        "patient_age": 34,
-        "patient_gender": "Male",
-        "patient_contact_id": "PAT-9001",
-        "doctor_name": "Dr. Meena Iyer",
-        "doctor_registration_id": "MCI-78432",
-        "medications": [
-            {"drug_name": "Amoxicillin", "strength": "500mg", "frequency": "1-0-1", "duration": "5 Days", "instructions": "After food"},
-            {"drug_name": "Paracetamol", "strength": "650mg", "frequency": "1-1-1", "duration": "3 Days", "instructions": "As needed"},
-            {"drug_name": "Pantoprazole", "strength": "40mg", "frequency": "1-0-0", "duration": "5 Days", "instructions": "Before breakfast"},
-        ],
-        "status": PrescriptionStatus.NEW,
-        "color_code": "teal",
-        "delivery_mode": DeliveryMode.STORE_PICKUP,
-        "created_at": _ts_to_iso(_now() - timedelta(hours=1)),
-        "accepted_at": None,
-        "ready_at": None,
-        "completed_at": None,
-    }
+def _mock_order_detail(order_id: str) -> Optional[dict]:
+    for order in _MOCK_ORDERS_DB:
+        if order["id"] == order_id:
+            # Flatten structure to match response schema
+            d = order.copy()
+            pi = d.get("patient_info", {})
+            di = d.get("doctor_info", {})
+            ts = d.get("timestamps", {})
+            
+            return {
+                "id": d["id"],
+                "patient_name": pi.get("name"),
+                "patient_age": pi.get("age"),
+                "patient_gender": pi.get("gender"),
+                "patient_contact_id": pi.get("contact_id"),
+                "doctor_name": di.get("name"),
+                "doctor_registration_id": di.get("registration_id"),
+                "medications": d.get("medications", []),
+                "status": d.get("status"),
+                "color_code": STATUS_COLOR_MAP.get(d.get("status"), "gray"),
+                "delivery_mode": d.get("delivery_mode", DeliveryMode.STORE_PICKUP),
+                "created_at": ts.get("created_at"),
+                "accepted_at": ts.get("accepted_at"),
+                "ready_at": ts.get("ready_at"),
+                "completed_at": ts.get("completed_at"),
+            }
+    return None
 
 
 # ──────────────────────────────────────────────
@@ -352,29 +416,30 @@ async def update_order_status(order_id: str, new_status: str) -> dict:
     }
 
 
-def _mock_status_update(order_id: str, new_status: str) -> dict:
+def _mock_status_update(order_id: str, new_status: str) -> Optional[dict]:
     print(f"[MOCK] Order {order_id} → {new_status}")
     
     # Update global mock DB
     for order in _MOCK_ORDERS_DB:
         if order["id"] == order_id:
             order["status"] = new_status
-            order["color_code"] = STATUS_COLOR_MAP.get(new_status, "gray")
-            now = _now()
-            if new_status == PrescriptionStatus.ACCEPTED:
-                order["accepted_at"] = _ts_to_iso(now)
-            if new_status == PrescriptionStatus.READY:
-                order["ready_at"] = _ts_to_iso(now)
-            if new_status in (PrescriptionStatus.DELIVERED, PrescriptionStatus.PICKED_UP):
-                order["completed_at"] = _ts_to_iso(now)
-            break
+            ts = order["timestamps"]
+            now_iso = _ts_to_iso(_now())
             
-    return {
-        "id": order_id,
-        "status": new_status,
-        "color_code": STATUS_COLOR_MAP.get(new_status, "gray"),
-        "updated_at": _ts_to_iso(_now()),
-    }
+            if new_status == PrescriptionStatus.ACCEPTED:
+                ts["accepted_at"] = now_iso
+            elif new_status == PrescriptionStatus.READY:
+                ts["ready_at"] = now_iso
+            elif new_status in (PrescriptionStatus.DELIVERED, PrescriptionStatus.PICKED_UP):
+                ts["completed_at"] = now_iso
+                
+            return {
+                "id": order_id,
+                "status": new_status,
+                "color_code": STATUS_COLOR_MAP.get(new_status, "gray"),
+                "updated_at": now_iso,
+            }
+    return None
 
 
 # ──────────────────────────────────────────────
@@ -396,6 +461,7 @@ async def create_order(
     now = _now()
 
     order_data = {
+        "id": order_id, # Added ID here for consistency
         "patient_info": {
             "name": patient_name,
             "age": patient_age,
@@ -410,7 +476,7 @@ async def create_order(
         "status": PrescriptionStatus.NEW,
         "delivery_mode": delivery_mode,
         "timestamps": {
-            "created_at": now,
+            "created_at": _ts_to_iso(now),
             "accepted_at": None,
             "ready_at": None,
             "completed_at": None,
@@ -419,11 +485,19 @@ async def create_order(
 
     if firebase_service.mock_mode:
         print(f"[MOCK] Created pharmacy order {order_id}")
-        return {"id": order_id, **order_data, "timestamps": {k: _ts_to_iso(v) for k, v in order_data["timestamps"].items()}}
+        _MOCK_ORDERS_DB.insert(0, order_data) # Add to mock DB
+        return order_data
 
     db = firebase_service.db
-    db.collection(ORDERS_COLLECTION).document(order_id).set(order_data)
-    return {"id": order_id, **order_data}
+    # Remove 'id' if you don't want it stored in the doc body, but it's often useful
+    store_data = order_data.copy() 
+    store_data.pop("id")
+    # Convert string timestamps back to datetime for Firestore if needed, 
+    # but for now reusing the logic as is.
+    store_data["timestamps"]["created_at"] = now 
+    
+    db.collection(ORDERS_COLLECTION).document(order_id).set(store_data)
+    return order_data
 
 
 # ──────────────────────────────────────────────

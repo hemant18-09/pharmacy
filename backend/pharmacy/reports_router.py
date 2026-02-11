@@ -3,6 +3,7 @@ FastAPI Router – Pharmacy Reports / Analytics
 Prefix: /pharmacy/reports
 
 Endpoints:
+  GET /pharmacy/reports/stats           → Key metrics + status distribution
   GET /pharmacy/reports/daily-summary   → "Orders per day" chart (last 7 days)
   GET /pharmacy/reports/top-medicines   → "Most Dispensed" chart (top N)
 """
@@ -13,10 +14,23 @@ from typing import List
 
 from fastapi import APIRouter, Query
 
-from pharmacy.schemas import DailySummaryItem, TopMedicineItem
+from pharmacy.schemas import DailySummaryItem, TopMedicineItem, AnalyticsStatsResponse
 from pharmacy import reports_service as svc
 
 router = APIRouter(prefix="/pharmacy/reports", tags=["Pharmacy Reports"])
+
+
+# ──────────────────────────────────────────────
+# 0. Analytics key metrics + status distribution
+# ──────────────────────────────────────────────
+
+@router.get("/stats", response_model=AnalyticsStatsResponse)
+async def analytics_stats():
+    """
+    Returns key metrics for the Reports / Analytics page:
+    total_revenue, total_orders, avg_delivery_time_mins, and status_distribution.
+    """
+    return await svc.get_analytics_stats()
 
 
 # ──────────────────────────────────────────────
