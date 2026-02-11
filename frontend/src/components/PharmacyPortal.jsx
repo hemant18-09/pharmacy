@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, ShoppingCart, Package, FileText, Settings as SettingsIcon, LogOut,
-    Search, Bell, ChevronDown,
+    Search, ChevronDown,
     ShoppingBag, CheckCircle, AlertTriangle, TrendingUp,
     Eye, Clock, CheckCircle2, AlertCircle,
     X, MessageSquare, MapPin,
     Plus, Filter, Edit2, Trash2, Menu,
-    User, Shield, Users, Camera, Save, Calendar, Download
+    User, Camera, Save, Calendar, Download
 } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -227,11 +227,6 @@ const Header = ({ onMenuClick, currentUser, logout, searchQuery, onSearchChange 
             </div>
 
             <div className="flex items-center gap-4 md:gap-6">
-                <button className="relative p-2 text-gray-500 hover:text-teal-700 transition-colors rounded-full hover:bg-gray-50">
-                    <Bell size={20} />
-                    <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
-                </button>
-
                 <div className="relative">
                     <div
                         onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -1336,24 +1331,32 @@ const ReportsScreen = () => {
 
 const SettingsScreen = () => {
     const [activeTab, setActiveTab] = useState('general');
-    const [notifications, setNotifications] = useState({
-        email: true,
-        sms: true,
-        dailyReport: false,
-    });
     const [saveStatus, setSaveStatus] = useState(null); // 'saving', 'success', 'error', null
 
+    const [avatarPreview, setAvatarPreview] = useState(null);
     const tabs = [
         { id: 'general', label: 'General', icon: User },
-        { id: 'security', label: 'Security', icon: Shield },
-        { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'team', label: 'Team Members', icon: Users },
     ];
 
-    const handleToggle = (key) => {
-        if (key === 'sms') return; // Locked as per requirements
-        setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+    const handleAvatarChange = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const previewUrl = URL.createObjectURL(file);
+        setAvatarPreview((prev) => {
+            if (prev) {
+                URL.revokeObjectURL(prev);
+            }
+            return previewUrl;
+        });
     };
+
+    useEffect(() => {
+        return () => {
+            if (avatarPreview) {
+                URL.revokeObjectURL(avatarPreview);
+            }
+        };
+    }, [avatarPreview]);
 
     const handleSave = async () => {
         setSaveStatus('saving');
@@ -1406,18 +1409,34 @@ const SettingsScreen = () => {
                             <p className="text-gray-500 text-sm">Manage your pharmacy profile and operating details</p>
                         </div>
 
-                        <div className="p-8 space-y-8 max-w-3xl">
+                        <div className="p-8 space-y-8 max-w-3xl mx-auto">
                             {/* Profile Section */}
-                            <div className="flex items-start gap-6">
-                                <div className="relative group cursor-pointer">
-                                    <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-2xl font-bold border-4 border-white shadow-sm ring-2 ring-gray-100">
-                                        DP
+                            <div className="flex flex-col items-center gap-4">
+                                <p className="text-sm font-semibold text-gray-700 tracking-wide uppercase">Profile Picture</p>
+                                <input
+                                    id="avatar-upload"
+                                    type="file"
+                                    accept="image/*"
+                                    className="sr-only"
+                                    onChange={handleAvatarChange}
+                                />
+                                <label
+                                    htmlFor="avatar-upload"
+                                    className="group relative w-24 h-24 -translate-y-3 cursor-pointer overflow-hidden rounded-full border-4 border-white bg-teal-100 shadow-sm transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500"
+                                >
+                                    <div className="absolute inset-0 flex items-center justify-center z-0">
+                                        {avatarPreview ? (
+                                            <img src={avatarPreview} alt="Profile" className="h-full w-full object-cover" />
+                                        ) : (
+                                            <span className="text-teal-700 text-2xl font-bold">DP</span>
+                                        )}
                                     </div>
-                                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 transition-opacity group-hover:opacity-100 flex items-center justify-center z-10">
                                         <Camera className="text-white" size={24} />
                                     </div>
-                                </div>
-                                <div className="flex-1 space-y-4">
+                                </label>
+                                <p className="text-xs text-gray-500">Click to upload a new logo</p>
+                                <div className="w-full space-y-10 text-left">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Pharmacy Name</label>
@@ -1512,70 +1531,9 @@ const SettingsScreen = () => {
                     </div>
                 )}
 
-                {/* Notifications Tab Content */}
-                {activeTab === 'notifications' && (
-                    <div className="flex-1 overflow-y-auto">
-                        <div className="p-6 border-b border-gray-100">
-                            <h2 className="text-xl font-bold text-gray-800">Notification Preferences</h2>
-                            <p className="text-gray-500 text-sm">Control how and when you receive alerts</p>
-                        </div>
-                        <div className="p-8 space-y-6 max-w-2xl">
 
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                <div>
-                                    <h4 className="font-medium text-gray-900">Email on New Order</h4>
-                                    <p className="text-sm text-gray-500">Receive an email whenever a new order is placed</p>
-                                </div>
-                                <button
-                                    onClick={() => handleToggle('email')}
-                                    className={`w-12 h-6 rounded-full transition-colors relative ${notifications.email ? 'bg-teal-600' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.email ? 'translate-x-6' : 'translate-x-0'}`} />
-                                </button>
-                            </div>
 
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 opacity-75">
-                                <div>
-                                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                                        SMS for Emergency Cases
-                                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Locked</span>
-                                    </h4>
-                                    <p className="text-sm text-gray-500">Instant SMS alerts for high-priority/emergency orders</p>
-                                </div>
-                                <button
-                                    disabled
-                                    className="w-12 h-6 rounded-full bg-teal-600 relative cursor-not-allowed opacity-80"
-                                >
-                                    <span className="absolute top-1 left-1 bg-white w-4 h-4 rounded-full translate-x-6" />
-                                </button>
-                            </div>
 
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                <div>
-                                    <h4 className="font-medium text-gray-900">Daily Report Summary</h4>
-                                    <p className="text-sm text-gray-500">Receive a daily digest of sales and inventory status</p>
-                                </div>
-                                <button
-                                    onClick={() => handleToggle('dailyReport')}
-                                    className={`w-12 h-6 rounded-full transition-colors relative ${notifications.dailyReport ? 'bg-teal-600' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.dailyReport ? 'translate-x-6' : 'translate-x-0'}`} />
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
-                )}
-
-                {/* Placeholders for other tabs */}
-                {(activeTab === 'security' || activeTab === 'team') && (
-                    <div className="flex-1 flex items-center justify-center text-gray-400">
-                        <div className="text-center">
-                            <p className="text-xl font-medium">Coming Soon</p>
-                            <p className="text-sm">This module is under development.</p>
-                        </div>
-                    </div>
-                )}
 
             </div>
         </div>
