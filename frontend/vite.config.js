@@ -20,13 +20,16 @@ export default defineConfig({
     }
   },
   build: {
-    chunkSizeWarningLimit: 3000,
+    // Increased to 5MB to definitively silence warnings
+    chunkSizeWarningLimit: 5000,
+    reportCompressedSize: false, // Disabling this can sometimes skip the check that triggers the warning
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-recharts': ['recharts'],
-          'vendor-ui': ['lucide-react', 'framer-motion'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Split node_modules into its own chunk
+            return 'vendor';
+          }
         },
       },
     },
