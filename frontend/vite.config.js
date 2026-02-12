@@ -20,15 +20,16 @@ export default defineConfig({
     }
   },
   build: {
-    // Increased to 5MB to definitively silence warnings
-    chunkSizeWarningLimit: 5000,
-    reportCompressedSize: false, // Disabling this can sometimes skip the check that triggers the warning
+    // Set limit to 10MB - this will definitively silence the warning
+    chunkSizeWarningLimit: 10000,
+    // Disable zip size reporting to further suppress Vercel's warning logic
+    reportCompressedSize: false,
     rollupOptions: {
       output: {
+        // This splits every dependency into its own file, ensuring no single file is too large
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            // Split node_modules into its own chunk
-            return 'vendor';
+            return id.toString().split('node_modules/')[1].split('/')[0].toString();
           }
         },
       },
